@@ -7,14 +7,9 @@ Za implementacijo uporabljamo odprtokodno Pac-Man rešitev kot osnovo:
 - https://github.com/Abdelaal495/Multi-Agent-Pac-Man
 
 ## Zagon programa
-Program lahko zaženemo z naslednjim ukazom:
+Program lahko zaženemo z naslednjimi ukazi:
 
 ```bash
 python pacman.py -p MinimaxAgent -l minimaxClassic -a depth=2
-
-## Opis projekta
-Cilj projekta je analiza in primerjava algoritmov odločanja (Minimax, Alpha-Beta in Expectimax) v okolju igre Pac-Man.
-
-## Opomba
-Obstoječo implementacijo uporabljamo kot osnovo, ki smo jo prilagodili za potrebe eksperimentov in analize.
-
+python pacman.py -p AlphaBetaAgent -l minimaxClassic -a depth=3
+python pacman.py -p ExpectimaxAgent -l minimaxClassic -a depth=2
