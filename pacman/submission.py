@@ -190,6 +190,7 @@ class MinimaxAgent(MultiAgentSearchAgent):
             return min([(minimax(gameState.generateSuccessor(player, action), depth, (player + 1) % gameState.getNumAgents())[0], action) for action in gameState.getLegalActions(player)])
 
         action = minimax(gameState, self.depth, 0)[1]
+        print("Minimax action:", action, "Score:", gameState.getScore())
         logResults(gameState.getScore())
         return action
         # END_YOUR_CODE
@@ -240,7 +241,11 @@ class AlphaBetaAgent(MultiAgentSearchAgent):
                     beta = min(minValue, beta)
             return (minValue, minAction)
         
-        return minimax_AlphaBeta(gameState, self.depth, float('-inf'), float('inf'), 0)[1]
+        #return minimax_AlphaBeta(gameState, self.depth, float('-inf'), float('inf'), 0)[1]
+        action = minimax_AlphaBeta(gameState, self.depth, float('-inf'), float('inf'), 0)[1]
+        print("AlphaBeta action:", action, "Score:", gameState.getScore())
+        return action
+
         # END_YOUR_CODE
 
 ######################################################################################
@@ -270,7 +275,11 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
          possibleScores = [expectimax(gameState.generateSuccessor(player, action), depth, (player + 1) % gameState.getNumAgents())[0] for action in legalActions]
          return (sum(possibleScores)/len(possibleScores), random.choice(legalActions))
      
-     return expectimax(gameState, self.depth, 0)[1]
+     #return expectimax(gameState, self.depth, 0)[1]
+     action = expectimax(gameState, self.depth, 0)[1]
+     print("Expectimax action:", action, "Score:", gameState.getScore())
+     return action
+    
      # END_YOUR_CODE
 
 ######################################################################################
