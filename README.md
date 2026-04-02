@@ -12,7 +12,6 @@ Program lahko zaženemo z naslednjim ukazom:
 ```bash
 python pacman.py -p MinimaxAgent -l minimaxClassic -a depth=2
 
-```md
 ## Opis projekta
 Cilj projekta je analiza in primerjava algoritmov odločanja (Minimax, Alpha-Beta in Expectimax) v okolju igre Pac-Man.
 
