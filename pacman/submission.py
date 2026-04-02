@@ -274,27 +274,31 @@ def betterEvaluationFunction(currentGameState: GameState) -> float:
       Your extreme, unstoppable evaluation function (problem 4). Note that you can't fix a seed in this function.
     """
 
-    # BEGIN_YOUR_CODE (our solution is 16 lines of code, but don't worry if you deviate from this)
-    currentDistance = 0
-    currentScore = currentGameState.getScore()
-    min_capsuleDistance = float('inf')
-    min_ghostDistance = float('inf')
-    
-    queue = util.Queue()
-    queue.push(currentGameState.getPacmanPosition())
+    pos = currentGameState.getPacmanPosition()
+    food = currentGameState.getFood().asList()
+    ghosts = currentGameState.getGhostPositions()
+    capsules = currentGameState.getCapsules()
 
-    for capsule in currentGameState.getCapsules():
-        currentDistance = manhattanDistance(capsule, currentGameState.getPacmanPosition())
-        if currentDistance < min_capsuleDistance: min_capsuleDistance = currentDistance
-    
-    for ghost in currentGameState.getGhostPositions():
-        currentDistance = manhattanDistance(ghost, currentGameState.getPacmanPosition())
-        if currentDistance < min_ghostDistance: min_ghostDistance = currentDistance
-    
-    features = [currentScore, 1.0/min_capsuleDistance, 1.0/min_ghostDistance, len(currentGameState.getCapsules()), currentGameState.getNumFood()]
-    weights = [1, 3, -100, -10, -5]
-    return sum([features[i]*weights[i] for i in range(len(features))])
-    # END_YOUR_CODE
+    score = currentGameState.getScore()
+
+    # najbliža hrana
+    if food:
+        minFoodDist = min([manhattanDistance(pos, f) for f in food])
+        if minFoodDist > 0:
+            score += 10.0 / minFoodDist
+
+    # duhovi
+    if ghosts:
+        minGhostDist = min([manhattanDistance(pos, g) for g in ghosts])
+        if minGhostDist < 2:
+            score -= 500
+        else:
+            score += minGhostDist
+
+    # kapsule
+    score -= 5 * len(capsules)
+
+    return score
 
 
 # Abbreviation
