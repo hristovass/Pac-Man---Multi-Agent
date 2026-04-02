@@ -13,3 +13,11 @@ Program lahko zaženemo z naslednjimi ukazi:
 python pacman.py -p MinimaxAgent -l minimaxClassic -a depth=2
 python pacman.py -p AlphaBetaAgent -l minimaxClassic -a depth=3
 python pacman.py -p ExpectimaxAgent -l minimaxClassic -a depth=2
+```
+
+## Opis projekta
+Cilj projekta je analiza in primerjava algoritmov odločanja (Minimax, Alpha-Beta in Expectimax) v okolju igre Pac-Man.  
+Osredotočamo se na učinkovitost algoritmov, vedenje agentov ter vpliv globine iskanja na rezultate.
+
+## Opomba
+Obstoječo implementacijo uporabljamo kot osnovo, ki smo jo prilagodili za potrebe eksperimentov in analize.
