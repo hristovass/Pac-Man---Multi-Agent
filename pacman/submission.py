@@ -129,6 +129,9 @@ class MultiAgentSearchAgent(Agent):
         self.index = 0  # Pacman is always agent index 0
         self.evaluationFunction = util.lookup(evalFn, globals())
         self.depth = int(depth)
+        
+        print("Agent initialized with depth =", self.depth)
+        print("Evaluation function =", evalFn)
 
 ######################################################################################
 # Problem 1b: implementing minimax
@@ -299,3 +302,11 @@ def betterEvaluationFunction(currentGameState: GameState) -> float:
 
 # Abbreviation
 better = betterEvaluationFunction
+
+def testDifferentDepths(gameState):
+    print("Testing different depths...")
+
+    for d in [1, 2, 3]:
+        agent = MinimaxAgent(depth=str(d))
+        action = agent.getAction(gameState)
+        print("Depth:", d, "-> Action:", action)
