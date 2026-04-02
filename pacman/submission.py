@@ -7,6 +7,9 @@ from typing import Any, DefaultDict, List, Set, Tuple
 from game import Agent
 from pacman import GameState
 
+def logResults(score):
+    with open("results.txt", "a") as f:
+        f.write("Score: " + str(score) + "\n")
 
 
 class ReflexAgent(Agent):
@@ -185,8 +188,10 @@ class MinimaxAgent(MultiAgentSearchAgent):
             if player == 0: return max([(minimax(gameState.generateSuccessor(0, action), depth, 1)[0], action) for action in gameState.getLegalActions(0)])
             if player == (gameState.getNumAgents() - 1): depth -= 1
             return min([(minimax(gameState.generateSuccessor(player, action), depth, (player + 1) % gameState.getNumAgents())[0], action) for action in gameState.getLegalActions(player)])
-        
-        return minimax(gameState, self.depth, 0)[1]
+
+        action = minimax(gameState, self.depth, 0)[1]
+        logResults(gameState.getScore())
+        return action
         # END_YOUR_CODE
 
 ######################################################################################
