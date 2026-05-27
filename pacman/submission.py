@@ -6,6 +6,8 @@ from typing import Any, DefaultDict, List, Set, Tuple
 
 from game import Agent
 from pacman import GameState
+import math
+import time
 
 def logResults(score):
     with open("results.txt", "a") as f:
@@ -286,6 +288,103 @@ class ExpectimaxAgent(MultiAgentSearchAgent):
 # Problem 4a (extra credit): creating a better evaluation function
 
 
+class MCTSAgent(MultiAgentSearchAgent):
+    """
+    Monte Carlo Tree Search agent za Pac-Man.
+    Agent koristi simulacije slučajnih poteza za procenu najbolje akcije.
+    """
+
+    def __init__(self, evalFn='betterEvaluationFunction', depth='2', simulations='40', rolloutDepth='10'):
+        super().__init__(evalFn, depth)
+        self.simulations = int(simulations)
+        self.rolloutDepth = int(rolloutDepth)
+
+    def getAction(self, gameState: GameState) -> str:
+        legalActions = gameState.getLegalActions(0)
+
+        if Directions.STOP in legalActions:
+            legalActions.remove(Directions.STOP)
+
+        if not legalActions:
+            return Directions.STOP
+
+        actionScores = {}
+
+        for action in legalActions:
+            totalScore = 0
+
+            for _ in range(self.simulations):
+                successor = gameState.generateSuccessor(0, action)
+                rolloutScore = self.rollout(successor)
+                totalScore += rolloutScore
+
+            actionScores[action] = totalScore / self.simulations
+
+        bestAction = max(actionScores, key=actionScores.get)
+        print("MCTS action:", bestAction, "Score:", gameState.getScore())
+        return bestAction
+
+    def rollout(self, state: GameState) -> float:
+        currentState = state
+        depth = 0
+        agentIndex = 1
+
+        while depth < self.rolloutDepth:
+            if currentState.isWin() or currentState.isLose():
+                break
+
+            legalActions = currentState.getLegalActions(agentIndex)
+
+            if not legalActions:
+                break
+
+            action = random.choice(legalActions)
+            currentState = currentState.generateSuccessor(agentIndex, action)
+
+            agentIndex = (agentIndex + 1) % currentState.getNumAgents()
+
+            if agentIndex == 0:
+                depth += 1
+
+        return self.evaluationFunction(currentState)
+
+class HybridMCTSAgent(MCTSAgent):
+    """
+    Naša ideja:
+    Hibridni MCTS agent koji kombinuje Monte Carlo simulacije
+    sa heurističkom procenom sigurnosti, hrane i kapsula.
+    """
+
+    def __init__(self, evalFn='hybridEvaluationFunction', depth='2', simulations='50', rolloutDepth='12'):
+        super().__init__(evalFn, depth, simulations, rolloutDepth)
+
+    def getAction(self, gameState: GameState) -> str:
+        legalActions = gameState.getLegalActions(0)
+
+        if Directions.STOP in legalActions:
+            legalActions.remove(Directions.STOP)
+
+        if not legalActions:
+            return Directions.STOP
+
+        actionScores = {}
+
+        for action in legalActions:
+            successor = gameState.generateSuccessor(0, action)
+
+            simulationScore = 0
+            for _ in range(self.simulations):
+                simulationScore += self.rollout(successor)
+
+            averageSimulationScore = simulationScore / self.simulations
+            heuristicScore = hybridEvaluationFunction(successor)
+
+            actionScores[action] = 0.7 * averageSimulationScore + 0.3 * heuristicScore
+
+        bestAction = max(actionScores, key=actionScores.get)
+        print("HybridMCTS action:", bestAction, "Score:", gameState.getScore())
+        return bestAction
+
 def betterEvaluationFunction(currentGameState: GameState) -> float:
     """
       Your extreme, unstoppable evaluation function (problem 4). Note that you can't fix a seed in this function.
@@ -318,8 +417,57 @@ def betterEvaluationFunction(currentGameState: GameState) -> float:
     return score
 
 
+def hybridEvaluationFunction(currentGameState: GameState) -> float:
+    """
+    Naša izboljšana evalvacijska funkcija.
+    Upošteva:
+    - trenutno število točk,
+    - razdaljo do hrane,
+    - razdaljo do duhov,
+    - kapsule,
+    - zmago in poraz.
+    """
+
+    if currentGameState.isWin():
+        return float("inf")
+
+    if currentGameState.isLose():
+        return float("-inf")
+
+    pacmanPos = currentGameState.getPacmanPosition()
+    foodList = currentGameState.getFood().asList()
+    ghostStates = currentGameState.getGhostStates()
+    capsules = currentGameState.getCapsules()
+
+    score = currentGameState.getScore()
+
+    if foodList:
+        foodDistances = [manhattanDistance(pacmanPos, food) for food in foodList]
+        closestFood = min(foodDistances)
+        score += 20.0 / (closestFood + 1)
+        score -= 4 * len(foodList)
+
+    for ghost in ghostStates:
+        ghostPos = ghost.getPosition()
+        ghostDistance = manhattanDistance(pacmanPos, ghostPos)
+
+        if ghost.scaredTimer > 0:
+            score += 30.0 / (ghostDistance + 1)
+        else:
+            if ghostDistance <= 1:
+                score -= 1000
+            elif ghostDistance <= 3:
+                score -= 100.0 / ghostDistance
+            else:
+                score += 2 * ghostDistance
+
+    score -= 15 * len(capsules)
+
+    return score
+
 # Abbreviation
 better = betterEvaluationFunction
+hybrid = hybridEvaluationFunction
 
 def testDifferentDepths(gameState):
     print("Testing different depths...")
