@@ -1,0 +1,6 @@
+agent,arguments,games,average_score,average_time,win_rate
+MinimaxAgent,,20,0.0,2.5135689854621885,5.0
+AlphaBetaAgent,,20,0.0,1.7820581316947937,5.0
+ExpectimaxAgent,,20,0.0,1.775203287601471,5.0
+MCTSAgent,"simulations=15,rolloutDepth=6",20,0.0,4.450627839565277,40.0
+HybridMCTSAgent,"simulations=20,rolloutDepth=8",20,0.0,9.17598021030426,45.0

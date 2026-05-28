@@ -9,7 +9,7 @@ AGENTS = [
     ("AlphaBetaAgent", ""),
     ("ExpectimaxAgent", ""),
     ("MCTSAgent", "simulations=15,rolloutDepth=6"),
-    ("HybridMCTSAgent", "simulations=15,rolloutDepth=6"),
+    ("HybridMCTSAgent", "simulations=20,rolloutDepth=8"),
 ]
 
 
@@ -18,13 +18,13 @@ LAYOUT = "smallClassic"
 
 
 def parse_score(output):
-    score_match = re.search(r"Score:\s*(-?\d+)", output)
-    if score_match:
-        return int(score_match.group(1))
-
     average_match = re.search(r"Average Score:\s*(-?\d+\.?\d*)", output)
     if average_match:
         return float(average_match.group(1))
+
+    score_matches = re.findall(r"Score:\s*(-?\d+)", output)
+    if score_matches:
+        return int(score_matches[-1])
 
     return None
 

@@ -352,10 +352,10 @@ class HybridMCTSAgent(MCTSAgent):
     """
     Naša ideja:
     Hibridni MCTS agent koji kombinuje Monte Carlo simulacije
-    sa heurističkom procenom sigurnosti, hrane i kapsula.
+    sa sigurnosnom heuristikom.
     """
 
-    def __init__(self, evalFn='hybridEvaluationFunction', depth='2', simulations='50', rolloutDepth='12'):
+    def __init__(self, evalFn='betterEvaluationFunction', depth='2', simulations='20', rolloutDepth='8'):
         super().__init__(evalFn, depth, simulations, rolloutDepth)
 
     def getAction(self, gameState: GameState) -> str:
@@ -377,13 +377,41 @@ class HybridMCTSAgent(MCTSAgent):
                 simulationScore += self.rollout(successor)
 
             averageSimulationScore = simulationScore / self.simulations
-            heuristicScore = hybridEvaluationFunction(successor)
 
-            actionScores[action] = 0.7 * averageSimulationScore + 0.3 * heuristicScore
+            safetyBonus = self.safetyHeuristic(successor)
+
+            actionScores[action] = averageSimulationScore + safetyBonus
 
         bestAction = max(actionScores, key=actionScores.get)
         print("HybridMCTS action:", bestAction, "Score:", gameState.getScore())
         return bestAction
+
+    def safetyHeuristic(self, gameState: GameState) -> float:
+        pacmanPos = gameState.getPacmanPosition()
+        ghostStates = gameState.getGhostStates()
+        foodList = gameState.getFood().asList()
+        capsules = gameState.getCapsules()
+
+        bonus = 0
+
+        if foodList:
+            closestFood = min(manhattanDistance(pacmanPos, food) for food in foodList)
+            bonus += 10.0 / (closestFood + 1)
+
+        for ghost in ghostStates:
+            ghostDistance = manhattanDistance(pacmanPos, ghost.getPosition())
+
+            if ghost.scaredTimer == 0:
+                if ghostDistance <= 1:
+                    bonus -= 1000
+                elif ghostDistance <= 3:
+                    bonus -= 200 / ghostDistance
+            else:
+                bonus += 50.0 / (ghostDistance + 1)
+
+        bonus -= 5 * len(capsules)
+
+        return bonus
 
 def betterEvaluationFunction(currentGameState: GameState) -> float:
     """
