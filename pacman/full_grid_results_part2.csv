@@ -1,0 +1,5 @@
+layout,configuration,agent,depth,simulations,rollout_depth,games,average_score,median_score,std_score,min_score,max_score,wins,win_rate,total_time,average_time,status,error
+mediumClassic,Hybrid_s40_r6,HybridMCTSAgent,,40,6,50,,1274.0,649.3577828453617,-336.0,2019.0,33,66.0,1016.2338709831238,20.324677419662475,OK,
+mediumClassic,Hybrid_s40_r8,HybridMCTSAgent,,40,8,50,,1339.0,510.46941093815417,-295.0,1967.0,42,84.0,1810.5971190929413,36.211942381858826,OK,
+openClassic,Minimax_d1,MinimaxAgent,1,,,50,,-1330.0,1023.0334109544409,-4602.0,-490.0,0,0.0,91.64227294921875,1.832845458984375,OK,
+openClassic,Minimax_d2,MinimaxAgent,2,,,50,,-1063.0,811.0434396460573,-3683.0,-415.0,0,0.0,222.356374502182,4.44712749004364,OK,
