@@ -12,6 +12,7 @@ from itertools import product
 # ============================================================
 
 GAMES_PER_CONFIGURATION = 50
+GAME_TIMEOUT_SECONDS = 25
 
 LAYOUTS = [
     "smallClassic",
@@ -138,9 +139,14 @@ def build_configurations():
 # ============================================================
 
 def parse_scores(output):
+    """
+    Parsira listu rezultata kada pacman.py ispiše:
+        Scores: 123, 456, ...
+    """
     match = re.search(
         r"Scores:\s*(.*)",
-        output
+        output,
+        flags=re.IGNORECASE
     )
 
     if not match:
@@ -149,18 +155,28 @@ def parse_scores(output):
     scores = []
 
     for value in match.group(1).split(","):
-        try:
-            scores.append(float(value.strip()))
-        except ValueError:
-            pass
+        number = re.search(
+            r"-?\d+(?:\.\d+)?",
+            value
+        )
+
+        if number:
+            scores.append(
+                float(number.group(0))
+            )
 
     return scores
 
 
 def parse_average_score(output):
+    """
+    Fallback za varijante koje ispisuju samo:
+        Average Score: 123.0
+    """
     match = re.search(
-        r"Average Score:\s*(-?\d+(?:\.\d+)?)",
-        output
+        r"Average\s+Score:\s*(-?\d+(?:\.\d+)?)",
+        output,
+        flags=re.IGNORECASE
     )
 
     if match:
@@ -169,10 +185,33 @@ def parse_average_score(output):
     return None
 
 
+def parse_single_score(output):
+    """
+    Za jednu igru mnoge verzije Pacman-a ne ispisuju 'Scores:',
+    već završnu poruku tipa:
+        Pacman emerges victorious! Score: 123
+        Pacman died! Score: -456
+
+    Uzimamo POSLEDNJI 'Score:' u outputu da izbegnemo eventualne
+    debug poruke koje su se pojavile ranije.
+    """
+    matches = re.findall(
+        r"(?<!Average\s)\bScore:\s*(-?\d+(?:\.\d+)?)",
+        output,
+        flags=re.IGNORECASE
+    )
+
+    if matches:
+        return float(matches[-1])
+
+    return None
+
+
 def parse_win_rate(output):
     match = re.search(
-        r"Win Rate:\s*(\d+)/(\d+)\s*\(([\d.]+)\)",
-        output
+        r"Win\s+Rate:\s*(\d+)/(\d+)\s*\(([\d.]+)\)",
+        output,
+        flags=re.IGNORECASE
     )
 
     if not match:
@@ -184,6 +223,68 @@ def parse_win_rate(output):
     win_rate = 100.0 * wins / games
 
     return wins, win_rate
+
+
+def parse_single_game_result(output):
+    """
+    Vraća:
+        (score, won)
+
+    score -> float ili None
+    won   -> True / False / None
+    """
+
+    # 1) Najpre pokušaj standardni "Scores:" format.
+    scores = parse_scores(output)
+
+    if scores:
+        score = scores[0]
+    else:
+        # 2) Zatim završni "Score:" jedne igre.
+        score = parse_single_score(output)
+
+        # 3) Poslednji fallback: "Average Score:" za -n 1.
+        if score is None:
+            score = parse_average_score(output)
+
+    # Pobeda preko standardnog Win Rate reda.
+    parsed_wins, _ = parse_win_rate(output)
+
+    if parsed_wins is not None:
+        won = parsed_wins > 0
+
+    # Fallback na završnu Pacman poruku.
+    elif re.search(
+        r"Pacman\s+emerges\s+victorious",
+        output,
+        flags=re.IGNORECASE
+    ):
+        won = True
+
+    elif re.search(
+        r"Pacman\s+died",
+        output,
+        flags=re.IGNORECASE
+    ):
+        won = False
+
+    # Dodatni fallback ako implementacija koristi Record: Win/Loss.
+    else:
+        record_match = re.search(
+            r"Record:\s*(Win|Loss)",
+            output,
+            flags=re.IGNORECASE
+        )
+
+        if record_match:
+            won = (
+                record_match.group(1).lower()
+                == "win"
+            )
+        else:
+            won = None
+
+    return score, won
 
 
 # ============================================================
@@ -226,86 +327,195 @@ def run_configuration(layout, config):
     print(
         f"Layout = {layout} | "
         f"Configuration = {config['configuration']} | "
-        f"Games = {GAMES_PER_CONFIGURATION}"
+        f"Games = {GAMES_PER_CONFIGURATION} | "
+        f"Timeout/game = {GAME_TIMEOUT_SECONDS}s"
     )
 
     print("=" * 90)
 
-    command = [
-        sys.executable,
-        "pacman.py",
+    scores = []
+    wins = 0
+    known_outcomes = 0
+    completed_games = 0
+    timed_out_games = 0
+    error_games = 0
+    error_messages = []
 
-        "-p",
-        config["agent"],
+    configuration_start_time = time.time()
 
-        "-l",
-        layout,
+    # Važno:
+    # Svaka igra se pokreće kao poseban proces (-n 1), jer samo tako
+    # možemo imati timeout od 25 sekundi PO IGRI.
+    for game_number in range(1, GAMES_PER_CONFIGURATION + 1):
 
-        "-n",
-        str(GAMES_PER_CONFIGURATION),
+        command = [
+            sys.executable,
+            "pacman.py",
 
-        "-q"
-    ]
+            "-p",
+            config["agent"],
 
-    if config["args"]:
-        command.extend([
-            "-a",
-            config["args"]
-        ])
+            "-l",
+            layout,
 
-    start_time = time.time()
+            "-n",
+            "1",
 
-    process = subprocess.run(
-        command,
-        capture_output=True,
-        text=True
-    )
+            "-q"
+        ]
 
-    total_time = time.time() - start_time
+        if config["args"]:
+            command.extend([
+                "-a",
+                config["args"]
+            ])
 
-    if process.returncode != 0:
+        print(
+            f"Game {game_number}/{GAMES_PER_CONFIGURATION} ... ",
+            end="",
+            flush=True
+        )
 
-        print("ERROR:")
-        print(process.stderr)
+        game_start_time = time.time()
 
-        return {
-            "layout": layout,
-            "configuration": config["configuration"],
-            "agent": config["agent"],
-            "depth": config["depth"],
-            "simulations": config["simulations"],
-            "rollout_depth": config["rollout_depth"],
-            "games": GAMES_PER_CONFIGURATION,
+        try:
+            process = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=GAME_TIMEOUT_SECONDS
+            )
 
-            "average_score": None,
-            "median_score": None,
-            "std_score": None,
-            "min_score": None,
-            "max_score": None,
+        except subprocess.TimeoutExpired:
+            timed_out_games += 1
 
-            "wins": None,
-            "win_rate": None,
+            print(
+                f"TIMEOUT (> {GAME_TIMEOUT_SECONDS}s) -> skipped"
+            )
 
-            "total_time": total_time,
-            "average_time": None,
+            # Ova igra se preskače, a petlja automatski ide na sledeću.
+            continue
 
-            "status": "ERROR",
-            "error": process.stderr.strip()
-        }
+        game_time = time.time() - game_start_time
 
-    output = process.stdout
+        if process.returncode != 0:
+            error_games += 1
 
-    scores = parse_scores(output)
+            error_text = process.stderr.strip()
 
-    average_score = parse_average_score(output)
+            if not error_text:
+                error_text = (
+                    f"Game {game_number} exited with "
+                    f"return code {process.returncode}"
+                )
 
-    wins, win_rate = parse_win_rate(output)
+            error_messages.append(
+                f"Game {game_number}: {error_text}"
+            )
+
+            print("ERROR -> skipped")
+            continue
+
+        # Kombinujemo stdout i stderr jer neke verzije/projekti
+        # mogu deo informacija ispisivati na stderr.
+        output = (
+            (process.stdout or "")
+            + "\n"
+            + (process.stderr or "")
+        )
+
+        game_score, game_won = parse_single_game_result(
+            output
+        )
+
+        if game_score is None:
+            error_games += 1
+
+            error_messages.append(
+                f"Game {game_number}: score could not be parsed."
+            )
+
+            print("PARSE ERROR -> skipped")
+
+            # Da se problem odmah može videti, za prve 3 parse greške
+            # ispisujemo sirovi Pacman output.
+            if error_games <= 3:
+                print("--- pacman.py output ---")
+                print(
+                    output.strip()
+                    if output.strip()
+                    else "[NO OUTPUT]"
+                )
+                print("------------------------")
+
+            continue
+
+        scores.append(game_score)
+
+        if game_won is not None:
+            known_outcomes += 1
+
+            if game_won is True:
+                wins += 1
+
+        completed_games += 1
+
+        if game_won is True:
+            outcome = "WIN"
+        elif game_won is False:
+            outcome = "LOSS"
+        else:
+            outcome = "UNKNOWN"
+
+        print(
+            f"OK | score={game_score} | "
+            f"{outcome} | "
+            f"time={game_time:.2f}s"
+        )
+
+    total_time = time.time() - configuration_start_time
 
     stats = calculate_statistics(scores)
 
+    if completed_games > 0:
+        average_score = statistics.mean(scores)
+    else:
+        average_score = None
+
+    if known_outcomes > 0:
+        win_rate = 100.0 * wins / known_outcomes
+    else:
+        win_rate = None
+
+    # Prosečno realno vreme po pokušanoj igri.
     average_time = (
         total_time / GAMES_PER_CONFIGURATION
+        if GAMES_PER_CONFIGURATION > 0
+        else None
     )
+
+    if completed_games == 0:
+        status = "FAILED"
+    elif timed_out_games > 0 or error_games > 0:
+        status = "PARTIAL"
+    else:
+        status = "OK"
+
+    error_summary_parts = []
+
+    if timed_out_games:
+        error_summary_parts.append(
+            f"{timed_out_games} game(s) timed out "
+            f"after {GAME_TIMEOUT_SECONDS}s"
+        )
+
+    if error_games:
+        error_summary_parts.append(
+            f"{error_games} game(s) failed"
+        )
+
+    if error_messages:
+        error_summary_parts.extend(error_messages)
 
     result = {
         "layout":
@@ -326,6 +536,8 @@ def run_configuration(layout, config):
         "rollout_depth":
             config["rollout_depth"],
 
+        # Zadržano radi kompatibilnosti sa starim CSV-om:
+        # broj igara koje smo pokušali da pokrenemo.
         "games":
             GAMES_PER_CONFIGURATION,
 
@@ -357,24 +569,49 @@ def run_configuration(layout, config):
             average_time,
 
         "status":
-            "OK",
+            status,
 
         "error":
-            ""
+            " | ".join(error_summary_parts)
     }
+
+    print()
+    print(
+        f"Completed: {completed_games}/"
+        f"{GAMES_PER_CONFIGURATION}"
+    )
+
+    print(
+        f"Timed out: {timed_out_games}"
+    )
+
+    print(
+        f"Errors: {error_games}"
+    )
+
+    print(
+        f"Known win/loss outcomes: "
+        f"{known_outcomes}/{completed_games}"
+    )
 
     print(
         f"Average score: {average_score}"
     )
 
-    print(
-        f"Win rate: {win_rate}%"
-    )
+    if win_rate is None:
+        print("Win rate: N/A")
+    else:
+        print(
+            f"Win rate: {win_rate:.2f}%"
+        )
 
-    print(
-        f"Average time/game: "
-        f"{average_time:.4f} s"
-    )
+    if average_time is None:
+        print("Average time/game: N/A")
+    else:
+        print(
+            f"Average time/game: "
+            f"{average_time:.4f} s"
+        )
 
     return result
 
